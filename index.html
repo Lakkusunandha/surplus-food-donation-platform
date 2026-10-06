@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Surplus Food Donation Platform</title>
+  <style>
+    :root { --primary:#2e7d32; --secondary:#81c784; --light:#f4f6f8; --dark:#333; }
+    body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0; padding:0; background-color:var(--light); color:var(--dark); }
+    header { background-color:var(--primary); color:white; padding:1.5rem; text-align:center; box-shadow:0 2px 5px rgba(0,0,0,.1); }
+    nav { display:flex; justify-content:center; background-color:#1b5e20; }
+    nav button { background:none; border:none; color:white; padding:1rem 2rem; font-size:1rem; cursor:pointer; transition:background .3s; }
+    nav button.active, nav button:hover { background-color:var(--primary); font-weight:bold; }
+    .container { max-width:1000px; margin:2rem auto; padding:0 1rem; }
+    .card { background:white; padding:1.5rem; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.05); margin-bottom:2rem; }
+    .form-group { margin-bottom:1rem; }
+    label { display:block; margin-bottom:.5rem; font-weight:600; }
+    input, select, textarea { width:100%; padding:.75rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; }
+    button.btn { background-color:var(--primary); color:white; border:none; padding:.75rem 1.5rem; font-size:1rem; border-radius:4px; cursor:pointer; }
+    button.btn:hover { background-color:#1b5e20; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.5rem; }
+    .donation-card { border:1px solid #e0e0e0; border-radius:6px; padding:1rem; background-color:white; position:relative; }
+    .badge { display:inline-block; padding:.25rem .5rem; border-radius:4px; font-size:.85rem; font-weight:bold; color:white; text-transform:uppercase; }
+    .badge-available { background-color:#2e7d32; }
+    .badge-claimed { background-color:#f57c00; }
+    .badge-picked { background-color:#1976d2; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+    table { width:100%; border-collapse:collapse; margin-top:1rem; }
+    table, th, td { border:1px solid #ddd; }
+    th, td { padding:.75rem; text-align:left; }
+    th { background-color:#f0f0f0; }
+    @media (max-width:700px) {
+      nav { flex-wrap:wrap; }
+      nav button { flex:1; padding:.9rem .5rem; font-size:.9rem; }
+      .card { padding:1rem; overflow-x:auto; }
+      table { min-width:700px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Surplus Food Donation Platform</h1>
+    <p>Connecting surplus food donors with local NGOs and shelters</p>
+  </header>
+
+  <nav>
+    <button class="nav-btn active" onclick="switchTab('donor', this)">Donor Portal</button>
+    <button class="nav-btn" onclick="switchTab('ngo', this)">NGO Portal</button>
+    <button class="nav-btn" onclick="switchTab('history', this)">Donation History</button>
+  </nav>
+
+  <div class="container">
+    <div id="donor" class="tab-content active">
+      <div class="card">
+        <h2>Post Surplus Food Details</h2>
+        <form id="donationForm">
+          <div class="form-group"><label for="foodType">Food Type / Title</label><input type="text" id="foodType" placeholder="e.g., Rice, Curry, Bread" required></div>
+          <div class="form-group"><label for="quantity">Quantity (Servings)</label><input type="number" id="quantity" min="1" placeholder="e.g., 50" required></div>
+          <div class="form-group"><label for="city">City</label><input type="text" id="city" placeholder="e.g., Visakhapatnam" required></div>
+          <div class="form-group"><label for="location">Pickup Address</label><input type="text" id="location" placeholder="Full address or landmark" required></div>
+          <div class="form-group"><label for="pickupTime">Available Pickup Time</label><input type="time" id="pickupTime" required></div>
+          <button type="submit" class="btn">Post Donation</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="ngo" class="tab-content">
+      <div class="card">
+        <h2>Available Surplus Food Donations</h2>
+        <div class="form-group">
+          <label for="cityFilter">Filter by City:</label>
+          <input type="text" id="cityFilter" placeholder="Enter city name..." oninput="renderNGOFeed()">
+        </div>
+      </div>
+      <div id="ngoFeed" class="grid"></div>
+    </div>
+
+    <div id="history" class="tab-content">
+      <div class="card">
+        <h2>Donation Status Tracking & History</h2>
+        <table>
+          <thead><tr><th>ID</th><th>Food Item</th><th>Quantity</th><th>City</th><th>Pickup Time</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="historyTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let donations = [
+      {id:101, foodType:"Vegetable Biryani & Curd Rice", quantity:"40 servings", city:"Visakhapatnam", location:"Grand Palace Function Hall, MVP Colony", pickupTime:"18:00", status:"Available"},
+      {id:102, foodType:"Chapati & Dal", quantity:"25 servings", city:"Visakhapatnam", location:"Hostel Block A, Tech Campus", pickupTime:"20:30", status:"Claimed"}
+    ];
+
+    function switchTab(tabId, button) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      button.classList.add('active');
+      if (tabId === 'ngo') renderNGOFeed();
+      if (tabId === 'history') renderHistory();
+    }
+
+    document.getElementById('donationForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const newDonation = {
+        id: Date.now(),
+        foodType: document.getElementById('foodType').value.trim(),
+        quantity: document.getElementById('quantity').value + " servings",
+        city: document.getElementById('city').value.trim(),
+        location: document.getElementById('location').value.trim(),
+        pickupTime: document.getElementById('pickupTime').value,
+        status: "Available"
+      };
+      donations.push(newDonation);
+      alert("Donation posted successfully!");
+      this.reset();
+    });
+
+    function renderNGOFeed() {
+      const feed = document.getElementById('ngoFeed');
+      const filter = document.getElementById('cityFilter').value.toLowerCase().trim();
+      feed.innerHTML = "";
+      const filtered = donations.filter(d => d.city.toLowerCase().includes(filter) && d.status === "Available");
+      if (!filtered.length) {
+        feed.innerHTML = "<p>No available donations found for this area.</p>";
+        return;
+      }
+      filtered.forEach(d => {
+        const card = document.createElement('div');
+        card.className = "donation-card";
+        card.innerHTML = `
+          <span class="badge badge-available">${d.status}</span>
+          <h3>${d.foodType}</h3>
+          <p><strong>Quantity:</strong> ${d.quantity}</p>
+          <p><strong>City:</strong> ${d.city}</p>
+          <p><strong>Pickup Location:</strong> ${d.location}</p>
+          <p><strong>Pickup Time:</strong> ${d.pickupTime}</p>
+          <button class="btn" onclick="claimDonation(${d.id})">Claim Donation</button>`;
+        feed.appendChild(card);
+      });
+    }
+
+    function claimDonation(id) {
+      const donation = donations.find(d => d.id === id);
+      if (donation && donation.status === "Available") {
+        donation.status = "Claimed";
+        alert("You have claimed this donation! Please arrive by the pickup time.");
+        renderNGOFeed();
+      }
+    }
+
+    function markPickedUp(id) {
+      const donation = donations.find(d => d.id === id);
+      if (donation) {
+        donation.status = "Picked Up";
+        renderHistory();
+      }
+    }
+
+    function renderHistory() {
+      const table = document.getElementById('historyTable');
+      table.innerHTML = "";
+      donations.forEach(d => {
+        let badgeClass = "badge-available";
+        if (d.status === "Claimed") badgeClass = "badge-claimed";
+        if (d.status === "Picked Up") badgeClass = "badge-picked";
+        const actionBtn = d.status === "Claimed"
+          ? `<button class="btn" style="padding:.4rem .8rem;font-size:.85rem;" onclick="markPickedUp(${d.id})">Mark Picked Up</button>`
+          : `<span style="color:#777;">N/A</span>`;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>#${d.id}</td><td>${d.foodType}</td><td>${d.quantity}</td><td>${d.city}</td>
+          <td>${d.pickupTime}</td><td><span class="badge ${badgeClass}">${d.status}</span></td><td>${actionBtn}</td>`;
+        table.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
